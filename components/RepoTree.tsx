@@ -262,7 +262,7 @@ export default function RepoTree({
     if (!plain || plain.length < 5) return;
 
     const utter = new SpeechSynthesisUtterance(plain);
-    utter.rate = 0.95;
+    utter.rate = 0.8;
     utter.pitch = 1.0;
     // Pick best available voice — prefer natural-sounding ones
     const voices = window.speechSynthesis.getVoices();
