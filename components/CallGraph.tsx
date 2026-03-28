@@ -12,6 +12,11 @@ function sanitizeId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_]/g, "_");
 }
 
+function sanitizeLabel(s: string): string {
+  // Escape characters that break Mermaid label syntax: " [ ] ( ) { } < > #
+  return s.replace(/["\[\](){}<>#]/g, "");
+}
+
 function buildMermaidDiagram(
   entry: CallGraphEntry,
   filePath: string
@@ -20,13 +25,13 @@ function buildMermaidDiagram(
   const fileName = filePath.split("/").pop() ?? filePath;
   const fileId = sanitizeId(fileName);
 
-  lines.push(`  ${fileId}["${fileName}"]`);
+  lines.push(`  ${fileId}["${sanitizeLabel(fileName)}"]`);
   lines.push(`  style ${fileId} fill:#3b82f6,color:#fff,stroke:#1d4ed8`);
 
   // Imports → current file
   entry.imports.forEach((imp) => {
     const impId = sanitizeId(imp);
-    const label = imp.split("/").pop() ?? imp;
+    const label = sanitizeLabel(imp.split("/").pop() ?? imp);
     lines.push(`  ${impId}["${label}"] --> ${fileId}`);
     lines.push(`  style ${impId} fill:#27272a,color:#a1a1aa,stroke:#3f3f46`);
   });
@@ -34,13 +39,13 @@ function buildMermaidDiagram(
   // Functions in this file
   Object.entries(entry.functions).forEach(([fnName, { calls }]) => {
     const fnId = sanitizeId(fnName);
-    lines.push(`  ${fileId} --> ${fnId}("${fnName}()")`);
+    lines.push(`  ${fileId} --> ${fnId}("${sanitizeLabel(fnName)}()")`);
     lines.push(`  style ${fnId} fill:#1e1e2e,color:#c084fc,stroke:#7c3aed`);
 
     // Calls from function
     calls.forEach((call) => {
       const callId = sanitizeId(call) + "_call";
-      lines.push(`  ${fnId} --> ${callId}["${call}()"]`);
+      lines.push(`  ${fnId} --> ${callId}["${sanitizeLabel(call)}()"]`);
       lines.push(
         `  style ${callId} fill:#1e1e2e,color:#fbbf24,stroke:#a16207`
       );

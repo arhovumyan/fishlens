@@ -189,10 +189,14 @@ export default function Home() {
     }
   };
 
-  // File selection handler
+  // File selection handler — only fetch explanation for code files that were parsed
   const handleFileSelect = (filePath: string) => {
     setSelectedFile(filePath);
-    fetchExplanation(currentRepoUrl.current, filePath, experienceLevel);
+    if (callGraph[filePath]) {
+      fetchExplanation(currentRepoUrl.current, filePath, experienceLevel);
+    } else {
+      setExplanation("This file type was not parsed. Only .ts, .tsx, .js, and .jsx files are analyzed.");
+    }
   };
 
   // Re-fetch on experience level change

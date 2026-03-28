@@ -38,7 +38,9 @@ function shouldSkip(filePath: string): boolean {
 }
 
 export async function fetchRepoData(owner: string, repo: string) {
-  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  const token = process.env.GITHUB_TOKEN;
+  const hasRealToken = token && !token.startsWith("your_");
+  const octokit = new Octokit(hasRealToken ? { auth: token } : {});
 
   // 1. Repo metadata
   const { data: meta } = await octokit.rest.repos.get({ owner, repo });

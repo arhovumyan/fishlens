@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  const token = process.env.GITHUB_TOKEN;
+  const hasRealToken = token && !token.startsWith("your_");
+  const octokit = new Octokit(hasRealToken ? { auth: token } : {});
 
   let rawIssues;
   try {

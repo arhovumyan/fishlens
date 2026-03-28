@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { buildFileExplanationPrompt } from "@/lib/prompts";
 import { generateExplanationStream } from "@/lib/gemini";
-
-const INTERNAL_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { getAnalysis } from "@/lib/analyze";
 
 export async function POST(req: NextRequest) {
   let body: { repoUrl?: string; filePath?: string; experienceLevel?: string };
@@ -30,25 +28,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Call /api/parse to get parsed data
-  const parseRes = await fetch(`${INTERNAL_URL}/api/parse`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoUrl }),
-  });
+  let rawFiles: Record<string, string>;
+  let callGraph: Record<
+    string,
+    { imports: string[]; exports: string[]; functions: Record<string, { calls: string[] }> }
+  >;
 
-  if (!parseRes.ok) {
-    const err = await parseRes.text();
-    return new Response(err, { status: parseRes.status });
+  try {
+    const analysis = await getAnalysis(repoUrl);
+    rawFiles = analysis.rawFiles;
+    callGraph = analysis.callGraph;
+  } catch (err) {
+    console.error("[explain] Analysis failed:", err);
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch or parse repository" }),
+      { status: 502, headers: { "Content-Type": "application/json" } }
+    );
   }
-
-  const parsed = await parseRes.json();
-  const { rawFiles, callGraph } = parsed;
 
   const fileSource = rawFiles[filePath];
   if (!fileSource) {
     return new Response(
-      JSON.stringify({ error: `File not found: ${filePath}` }),
+      JSON.stringify({ error: `File not found in parsed sources: ${filePath}` }),
       { status: 404, headers: { "Content-Type": "application/json" } }
     );
   }

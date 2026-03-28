@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { buildRepoSummaryPrompt } from "@/lib/prompts";
 import { generateExplanationStream } from "@/lib/gemini";
-
-const INTERNAL_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { getAnalysis } from "@/lib/analyze";
 
 export async function POST(req: NextRequest) {
   let body: { repoUrl?: string; experienceLevel?: string };
@@ -29,20 +27,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Call /api/parse to get parsed data
-  const parseRes = await fetch(`${INTERNAL_URL}/api/parse`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoUrl }),
-  });
+  let fileTree: Array<{ path: string }>;
+  let callGraph: Record<string, { imports: string[]; exports: string[] }>;
+  let repoMeta: { name: string; description: string };
 
-  if (!parseRes.ok) {
-    const err = await parseRes.text();
-    return new Response(err, { status: parseRes.status });
+  try {
+    const analysis = await getAnalysis(repoUrl);
+    fileTree = analysis.fileTree;
+    callGraph = analysis.callGraph;
+    repoMeta = analysis.repoMeta;
+  } catch (err) {
+    console.error("[summary] Analysis failed:", err);
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch or parse repository" }),
+      { status: 502, headers: { "Content-Type": "application/json" } }
+    );
   }
-
-  const parsed = await parseRes.json();
-  const { fileTree, callGraph, repoMeta } = parsed;
 
   const prompt = buildRepoSummaryPrompt(
     fileTree,
