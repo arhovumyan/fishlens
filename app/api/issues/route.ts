@@ -4,6 +4,7 @@ import { parseGitHubUrl } from "@/lib/github";
 import { buildIssueExplanationPrompt } from "@/lib/prompts";
 import { generateExplanation } from "@/lib/gemini";
 import { getAICache, setAICache, aiCacheKey } from "@/lib/ai-cache";
+import { getAnalysis } from "@/lib/analyze";
 
 type Difficulty = "easy" | "medium" | "hard";
 const DIFFICULTY_ORDER: Record<Difficulty, number> = {
@@ -99,6 +100,17 @@ export async function GET(req: NextRequest) {
     (a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]
   );
 
+  // Fetch analysis context for better 'where to start' advice (likely hits cache)
+  let analysisContext: {
+    fileTree: Array<{ path: string }>;
+    repoMeta: { name: string; description: string };
+  } | null = null;
+  try {
+    analysisContext = await getAnalysis(repoUrl);
+  } catch (err) {
+    console.warn("[issues] Could not fetch analysis context for issues:", err);
+  }
+
   // Generate AI explanations — cap at MAX_GEMINI_CALLS, use cache
   const issues = await Promise.all(
     mapped.map(async (issue, idx) => {
@@ -111,7 +123,9 @@ export async function GET(req: NextRequest) {
         } else {
           const prompt = buildIssueExplanationPrompt(
             { title: issue.title, body: issue.body, labels: issue.labels },
-            experienceLevel as "junior" | "mid" | "senior"
+            experienceLevel as "junior" | "mid" | "senior" | any,
+            analysisContext?.fileTree,
+            analysisContext?.repoMeta
           );
           explanation = await generateExplanation(prompt);
           setAICache(cacheKey, explanation);

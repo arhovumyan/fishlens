@@ -70,7 +70,26 @@ export async function fetchRepoData(owner: string, repo: string) {
     description: meta.description ?? "",
     language: meta.language ?? "",
     stars: meta.stargazers_count,
+    forks: meta.forks_count,
+    branches: 1,
   };
+
+  try {
+    const { headers } = await octokit.rest.repos.listBranches({
+      owner,
+      repo,
+      per_page: 1,
+    });
+    const link = headers.link;
+    if (link) {
+      const match = link.match(/page=(\d+)>; rel="last"/);
+      if (match) {
+        repoMeta.branches = parseInt(match[1], 10);
+      }
+    }
+  } catch (err) {
+    console.error("[github] Failed to fetch branch count:", err);
+  }
 
   // 2. Recursive file tree
   const { data: refData } = await octokit.rest.git.getRef({

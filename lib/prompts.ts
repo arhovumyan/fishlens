@@ -179,17 +179,30 @@ ${depSection}`;
 
 export function buildIssueExplanationPrompt(
   issue: { title: string; body: string; labels: string[] },
-  experienceLevel: ExperienceLevel
+  experienceLevel: ExperienceLevel,
+  fileTree?: Array<{ path: string }>,
+  repoMeta?: { name: string; description: string }
 ): string {
+  const treeSection = fileTree
+    ? `\n\nRelevant files that might be related:\n${fileTree
+        .map((f) => f.path)
+        .slice(0, 50)
+        .join("\n")}`
+    : "";
+
   return `${LEVEL_INSTRUCTIONS[experienceLevel]}
 
 ${FORMAT_RULES}
 
-Keep your response under 100 words. Explain what this issue is about and where to start.
+Keep your response under 150 words. Cover:
+1. **Summary** — what the issue is about (1 sentence)
+2. **Where to start** — suggest specific files or directories from the file tree below to investigate
+3. **Potential approach** — a brief technical hint on how to solve it
 
 Title: ${issue.title}
 Labels: ${issue.labels.length ? issue.labels.join(", ") : "none"}
 
 Body:
-${issue.body || "No description provided."}`;
+${issue.body || "No description provided."}
+${treeSection}`;
 }

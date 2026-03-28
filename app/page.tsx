@@ -14,6 +14,8 @@ interface RepoMeta {
   description: string;
   language: string;
   stars: number;
+  forks: number;
+  branches: number;
 }
 
 interface FileTreeEntry {
@@ -233,12 +235,20 @@ export default function Home() {
             GLITCH
           </span>
           {repoMeta && (
-            <div className="flex items-center gap-3 text-xs text-zinc-500">
-              <span>{repoMeta.name}</span>
+            <div className="flex items-center gap-4 text-sm text-zinc-500">
+              <span className="text-zinc-200 font-semibold">{repoMeta.name}</span>
               <span>·</span>
-              <span>{repoMeta.language}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-zinc-400 text-base">★</span> {repoMeta.stars}
+              </span>
               <span>·</span>
-              <span>★ {repoMeta.stars}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-zinc-400 text-base">⑂</span> {repoMeta.forks}
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-zinc-400 text-base">⌥</span> {repoMeta.branches}
+              </span>
             </div>
           )}
         </div>

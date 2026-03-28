@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Issue {
   id: number;
@@ -147,9 +149,11 @@ export default function IssuesPanel({
                 </button>
 
                 {isExpanded && issue.explanation && (
-                  <div className="px-4 pb-3 border-t border-zinc-800/50">
-                    <div className="mt-3 text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
-                      {issue.explanation}
+                  <div className="px-4 pb-4 border-t border-zinc-800/50 bg-zinc-950/20">
+                    <div className="mt-3 prose-glitch text-[13px] leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {issue.explanation}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}
