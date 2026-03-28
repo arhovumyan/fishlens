@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -219,13 +218,11 @@ export default function RepoTree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [popupNode, setPopupNode] = useState<TreeNode | null>(null);
   const [localContent, setLocalContent] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [loadingAudio, setLoadingAudio] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-
-  useEffect(() => setMounted(true), []);
+  const [ttsError, setTtsError] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
 
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -251,8 +248,8 @@ export default function RepoTree({
   );
 
   const stopAudio = useCallback(() => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    if (audioUrlRef.current) { URL.revokeObjectURL(audioUrlRef.current); audioUrlRef.current = null; }
+    if (sourceNodeRef.current) { try { sourceNodeRef.current.stop(); } catch {} sourceNodeRef.current = null; }
+    if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
     setSpeaking(false);
     setLoadingAudio(false);
   }, []);
@@ -266,25 +263,28 @@ export default function RepoTree({
   const handleSpeak = useCallback(async (text: string) => {
     if (speaking) { stopAudio(); return; }
     const plain = text.replace(/```[\s\S]*?```/g, "").replace(/[*#`\[\]()]/g, "").replace(/\n{2,}/g, ". ").trim();
-    if (!plain) return;
+    if (!plain || plain.length < 5) return;
     setLoadingAudio(true);
+    setTtsError(false);
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: plain }),
       });
-      if (!res.ok) { console.error("TTS failed:", res.status); return; }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      audioUrlRef.current = url;
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => { setSpeaking(false); audioRef.current = null; };
-      audio.onerror = () => { setSpeaking(false); audioRef.current = null; };
-      await audio.play();
+      if (!res.ok) { console.error("TTS failed:", res.status); setTtsError(true); return; }
+      const arrayBuffer = await res.arrayBuffer();
+      const ctx = new AudioContext();
+      audioCtxRef.current = ctx;
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      sourceNodeRef.current = source;
+      source.onended = () => { setSpeaking(false); sourceNodeRef.current = null; };
+      source.start(0);
       setSpeaking(true);
-    } catch (err) { console.error("TTS error:", err); } finally { setLoadingAudio(false); }
+    } catch (err) { console.error("TTS error:", err); setTtsError(true); } finally { setLoadingAudio(false); }
   }, [speaking, stopAudio]);
 
   useEffect(() => {
@@ -307,21 +307,21 @@ export default function RepoTree({
       className="retro-tree-container custom-scrollbar"
       style={{ minHeight: 500, maxHeight: "80vh", overflow: "auto" }}
     >
-      <div className="p-6">
-        <TreeNodeComponent
-          node={tree}
-          expanded={expanded}
-          onToggle={handleToggle}
-          onNodeClick={handleNodeClick}
-          isRoot
-        />
-      </div>
+      <div className="flex flex-col md:flex-row">
+        {/* Tree */}
+        <div className={`p-6 ${popupNode ? "md:w-1/2" : "w-full"}`}>
+          <TreeNodeComponent
+            node={tree}
+            expanded={expanded}
+            onToggle={handleToggle}
+            onNodeClick={handleNodeClick}
+            isRoot
+          />
+        </div>
 
-      {/* Popup rendered via portal so no ancestor can clip it */}
-      {popupNode &&
-        mounted &&
-        createPortal(
-          <div className="retro-tree-popup">
+        {/* Inline explanation panel */}
+        {popupNode && (
+          <div className="retro-tree-popup-inline md:w-1/2 p-2">
             <div className="retro-window">
               <div className="retro-titlebar px-2 py-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -345,10 +345,10 @@ export default function RepoTree({
                       type="button"
                       onClick={() => handleSpeak(localContent || explanation)}
                       disabled={loadingAudio}
-                      className="text-[9px] px-1.5 py-0.5 font-bold bg-white/20 hover:bg-white/30 disabled:opacity-50 text-white uppercase tracking-wide"
-                      title={speaking ? "Stop" : "Read aloud"}
+                      className={`text-[9px] px-1.5 py-0.5 font-bold hover:bg-white/30 disabled:opacity-50 text-white uppercase tracking-wide ${ttsError ? "bg-red-500/40" : "bg-white/20"}`}
+                      title={speaking ? "Stop" : ttsError ? "TTS failed — try again" : "Read aloud"}
                     >
-                      {loadingAudio ? "..." : speaking ? "Stop" : "Speak"}
+                      {loadingAudio ? "..." : speaking ? "Stop" : ttsError ? "Retry" : "Speak"}
                     </button>
                   )}
                   <button
@@ -367,7 +367,7 @@ export default function RepoTree({
                     {popupNode.path}
                   </div>
                 )}
-                <div className="retro-panel-inset p-2 bg-white max-h-[280px] overflow-y-auto custom-scrollbar">
+                <div className="retro-panel-inset p-2 bg-white max-h-[350px] overflow-y-auto custom-scrollbar">
                   {localContent ? (
                     <div className="prose-glitch text-xs leading-relaxed">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -391,9 +391,9 @@ export default function RepoTree({
                 </div>
               </div>
             </div>
-          </div>,
-          document.body
+          </div>
         )}
+      </div>
     </div>
   );
 }

@@ -757,14 +757,9 @@
   background: #000080;
 }
 
-/* --- Popup (portal, fixed to top-right) --- */
+/* --- Explanation panel (inline, beside the tree) --- */
 
-.retro-tree-popup {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  width: min(380px, calc(100vw - 40px));
-  z-index: 9999;
+.retro-tree-popup-inline {
   animation: popup-appear 0.15s ease-out;
 }
 
