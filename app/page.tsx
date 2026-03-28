@@ -349,4 +349,49 @@ export default function Home() {
     </div>
   );
 }
+der-zinc-800 overflow-hidden bg-zinc-900/30" style={{ height: "500px" }}>
+            {/* File Explorer — 30% */}
+            <div className="w-[30%] shrink-0">
+              <FileExplorer
+                fileTree={fileTree}
+                selectedFile={selectedFile}
+                onFileSelect={handleFileSelect}
+              />
+            </div>
 
+            {/* Explanation Panel — 45% */}
+            <div className="w-[45%] border-l border-zinc-800">
+              <ExplanationPanel
+                text={explanation}
+                isStreaming={explanationStreaming}
+                experienceLevel={experienceLevel}
+                filePath={selectedFile}
+              />
+            </div>
+
+            {/* Call Graph — 25% */}
+            <div className="w-[25%] border-l border-zinc-800">
+              <CallGraph
+                entry={selectedFile ? callGraph[selectedFile] ?? null : null}
+                filePath={selectedFile}
+                dependencyGraph={dependencyGraph}
+                callGraph={callGraph}
+                onFileNavigate={handleFileSelect}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Issues Panel */}
+        {analyzed && (
+          <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+            <IssuesPanel
+              repoUrl={currentRepoUrl.current}
+              experienceLevel={experienceLevel}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
