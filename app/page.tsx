@@ -297,30 +297,33 @@ export default function Home() {
         {/* Summary Panel */}
         <SummaryPanel summary={summary} streaming={summaryStreaming} />
 
-        {/* Three-Panel Layout */}
+        {/* Panels Layout */}
         {analyzed && (
-          <div className="mt-4 flex rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30" style={{ height: "500px" }}>
-            {/* File Explorer — 30% */}
-            <div className="w-[30%] shrink-0">
-              <FileExplorer
-                fileTree={fileTree}
-                selectedFile={selectedFile}
-                onFileSelect={handleFileSelect}
-              />
+          <div className="mt-6 flex flex-col gap-4">
+            {/* Top Row: File Explorer & Explanation */}
+            <div className="flex rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30" style={{ height: "400px" }}>
+              {/* File Explorer — 35% */}
+              <div className="w-[35%] shrink-0">
+                <FileExplorer
+                  fileTree={fileTree}
+                  selectedFile={selectedFile}
+                  onFileSelect={handleFileSelect}
+                />
+              </div>
+
+              {/* Explanation Panel — 65% */}
+              <div className="w-[65%] border-l border-zinc-800">
+                <ExplanationPanel
+                  text={explanation}
+                  isStreaming={explanationStreaming}
+                  experienceLevel={experienceLevel}
+                  filePath={selectedFile}
+                />
+              </div>
             </div>
 
-            {/* Explanation Panel — 45% */}
-            <div className="w-[45%] border-l border-zinc-800">
-              <ExplanationPanel
-                text={explanation}
-                isStreaming={explanationStreaming}
-                experienceLevel={experienceLevel}
-                filePath={selectedFile}
-              />
-            </div>
-
-            {/* Call Graph — 25% */}
-            <div className="w-[25%] border-l border-zinc-800">
+            {/* Bottom Row: Call Graph (Full Width) */}
+            <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30" style={{ height: "450px" }}>
               <CallGraph
                 entry={selectedFile ? callGraph[selectedFile] ?? null : null}
                 filePath={selectedFile}
