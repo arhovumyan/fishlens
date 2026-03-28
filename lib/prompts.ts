@@ -180,8 +180,7 @@ ${depSection}`;
 export function buildIssueExplanationPrompt(
   issue: { title: string; body: string; labels: string[] },
   experienceLevel: ExperienceLevel,
-  fileTree?: Array<{ path: string }>,
-  repoMeta?: { name: string; description: string }
+  fileTree?: Array<{ path: string }>
 ): string {
   const treeSection = fileTree
     ? `\n\nRelevant files that might be related:\n${fileTree

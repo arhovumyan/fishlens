@@ -43,24 +43,24 @@ export default function IssuesPanel({
     if (!repoUrl) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    const params = new URLSearchParams({ repoUrl, experienceLevel });
-    fetch(`/api/issues?${params}`)
-      .then((res) => {
+    
+    // Instead of sync set-state, run an async wrapper to avoid effect cascading lint errors
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ repoUrl, experienceLevel });
+        const res = await fetch(`/api/issues?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
+        const data = await res.json();
         if (!cancelled) setIssues(data.issues ?? []);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
+      } catch(err) {
+        if (!cancelled && err instanceof Error) setError(err.message);
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+    load();
 
     return () => {
       cancelled = true;

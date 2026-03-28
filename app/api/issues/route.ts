@@ -123,9 +123,8 @@ export async function GET(req: NextRequest) {
         } else {
           const prompt = buildIssueExplanationPrompt(
             { title: issue.title, body: issue.body, labels: issue.labels },
-            experienceLevel as "junior" | "mid" | "senior" | any,
-            analysisContext?.fileTree,
-            analysisContext?.repoMeta
+            experienceLevel as "junior" | "mid" | "senior",
+            analysisContext?.fileTree
           );
           explanation = await generateExplanation(prompt);
           setAICache(cacheKey, explanation);
