@@ -70,7 +70,6 @@ export default function Home() {
   // Image gen
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [bannerLoading, setBannerLoading] = useState(false);
-  const [fileIcons, setFileIcons] = useState<Record<string, string>>({});
 
   // Visual vibe states
   const [now, setNow] = useState<Date | null>(null);
@@ -128,30 +127,6 @@ export default function Home() {
       console.error("[page] Banner gen failed:", err);
     } finally {
       setBannerLoading(false);
-    }
-  }, []);
-
-  // Generate pixel art icons for file types
-  const generateFileIcons = useCallback(async (extensions: string[]) => {
-    // Generate top 6 unique extensions
-    const toGenerate = extensions.slice(0, 6);
-    for (const ext of toGenerate) {
-      try {
-        const res = await fetch("/api/imagegen", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: `Create a tiny 32x32 pixel art icon for a .${ext} file. Retro Windows 95 style, simple, recognizable, chunky pixels, limited color palette. Just the icon, no text, no background, transparent.`,
-          }),
-        });
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (data.image) {
-          setFileIcons((prev) => ({ ...prev, [ext]: `data:${data.mimeType};base64,${data.image}` }));
-        }
-      } catch {
-        // Skip failed icons
-      }
     }
   }, []);
 
@@ -253,16 +228,9 @@ export default function Home() {
       // Start streaming summary
       fetchSummary(repoUrl, experienceLevel);
 
-      // Generate banner + file icons in background
+      // Generate banner in background
       const meta = parsed.repoMeta;
       generateBanner(meta.name, meta.description, meta.language);
-      const exts = [...new Set(
-        (parsed.fileTree as FileTreeEntry[])
-          .filter((f: FileTreeEntry) => f.type === "file")
-          .map((f: FileTreeEntry) => f.path.split(".").pop()?.toLowerCase())
-          .filter(Boolean)
-      )] as string[];
-      generateFileIcons(exts);
     } catch (err) {
       console.error("[page] Analyze failed:", err);
       setSummary(`Error: ${(err as Error).message}. Check the repo URL and try again.`);
@@ -458,7 +426,6 @@ export default function Home() {
                     >
                       <span className="text-sm">{stat.icon}</span>
                       <span className="font-bold text-xs">{typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}</span>
-                      <span className="retro-badge-tooltip">{stat.label}</span>
                     </div>
                   ))}
                 </div>
@@ -590,7 +557,6 @@ export default function Home() {
                     explanation={explanation}
                     explanationStreaming={explanationStreaming}
                     experienceLevel={experienceLevel}
-                    fileIcons={fileIcons}
                   />
                 </div>
               </div>

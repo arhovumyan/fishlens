@@ -140,14 +140,12 @@ function TreeNodeComponent({
   onToggle,
   onNodeClick,
   isRoot,
-  fileIcons,
 }: {
   node: TreeNode;
   expanded: Set<string>;
   onToggle: (path: string) => void;
   onNodeClick: (node: TreeNode) => void;
   isRoot?: boolean;
-  fileIcons?: Record<string, string>;
 }) {
   const isExpanded = expanded.has(node.path);
   const hasChildren = node.children.length > 0;
@@ -169,13 +167,7 @@ function TreeNodeComponent({
           title={node.path || node.name}
         >
           <span className="htree-icon">
-            {isRoot ? "💾" : node.isFolder ? "📁" : (() => {
-              const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
-              const icon = fileIcons?.[ext];
-              return icon ? (
-                <img src={icon} alt={ext} className="inline-block" style={{ width: 16, height: 16, imageRendering: "pixelated" }} />
-              ) : "📄";
-            })()}
+            {isRoot ? "💾" : node.isFolder ? "📁" : "📄"}
           </span>
           <span className="htree-lbl">{node.name}</span>
           {hasChildren && (
@@ -194,7 +186,7 @@ function TreeNodeComponent({
                 expanded={expanded}
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
-                fileIcons={fileIcons}
+
               />
             </div>
           ))}
@@ -211,7 +203,6 @@ export default function RepoTree({
   explanation,
   explanationStreaming,
   experienceLevel,
-  fileIcons,
 }: {
   fileTree: FileTreeEntry[];
   repoName: string;
@@ -219,7 +210,6 @@ export default function RepoTree({
   explanation: string;
   explanationStreaming: boolean;
   experienceLevel: "junior" | "mid" | "senior";
-  fileIcons?: Record<string, string>;
 }) {
   const tree = useMemo(
     () => buildTreeFromEntries(fileTree, repoName),
@@ -319,7 +309,6 @@ export default function RepoTree({
             onToggle={handleToggle}
             onNodeClick={handleNodeClick}
             isRoot
-            fileIcons={fileIcons}
           />
         </div>
 
