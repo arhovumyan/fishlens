@@ -1,5 +1,8 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 interface ExplanationPanelProps {
   text: string;
   isStreaming: boolean;
@@ -37,25 +40,19 @@ export default function ExplanationPanel({
 
   const levelConfig = {
     junior: {
-      badge: "Junior Explanation",
+      badge: "Junior",
       badgeColor: "bg-blue-500/20 text-blue-400",
       borderColor: "border-blue-500/50",
-      font: "font-sans",
-      padding: "pl-4",
     },
     mid: {
-      badge: "Mid-Level Explanation",
+      badge: "Mid-Level",
       badgeColor: "bg-emerald-500/20 text-emerald-400",
       borderColor: "border-emerald-500/50",
-      font: "font-sans",
-      padding: "",
     },
     senior: {
-      badge: "Senior Explanation",
+      badge: "Senior",
       badgeColor: "bg-zinc-500/20 text-zinc-400",
       borderColor: "border-zinc-600",
-      font: "font-mono text-[13px]",
-      padding: "",
     },
   };
 
@@ -63,7 +60,7 @@ export default function ExplanationPanel({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2">
+      <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2 shrink-0">
         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
           Explanation
         </span>
@@ -79,12 +76,10 @@ export default function ExplanationPanel({
         )}
       </div>
       <div
-        className={`p-4 border-l-2 ${config.borderColor} ${config.padding} m-2`}
+        className={`p-4 border-l-2 ${config.borderColor} m-2`}
       >
-        <div
-          className={`${config.font} text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap`}
-        >
-          {text}
+        <div className="prose-glitch text-sm leading-relaxed text-zinc-300">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           {isStreaming && <span className="cursor-blink" />}
         </div>
       </div>

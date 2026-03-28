@@ -2,12 +2,15 @@ type ExperienceLevel = "junior" | "mid" | "senior";
 
 const LEVEL_INSTRUCTIONS: Record<ExperienceLevel, string> = {
   junior:
-    "You are explaining this to a developer who understands basic programming but is brand new to this codebase. Name every function involved. Explain what each function does in one plain English sentence. Walk through the data flow step by step. Explain what each import is for. Do not assume knowledge of any framework.",
+    "Explain to a developer who knows basic programming but is new to this codebase. Be clear and practical. Explain what each key function does in one sentence.",
   mid:
-    "You are explaining this to a developer comfortable with TypeScript and common Node.js/React patterns but unfamiliar with this specific codebase. Focus on design decisions, data flow, and why things are structured this way.",
+    "Explain to a developer comfortable with TypeScript and React but unfamiliar with this codebase. Focus on design decisions and data flow.",
   senior:
-    "You are explaining this to a senior engineer. Focus on architecture, module boundaries, coupling, cohesion, and tradeoffs. Skip all syntax explanation. Be concise. Flag technical debt or areas of concern if you see any.",
+    "Explain to a senior engineer. Focus on architecture, tradeoffs, and coupling. Skip syntax explanation. Be terse.",
 };
+
+const FORMAT_RULES =
+  "Format with markdown. Use **bold** for key terms, `code` for identifiers, and short bullet lists. No filler sentences. No greetings. Start directly with the content.";
 
 export function buildFileExplanationPrompt(
   filePath: string,
@@ -35,8 +38,14 @@ export function buildFileExplanationPrompt(
 
   return `${LEVEL_INSTRUCTIONS[experienceLevel]}
 
-Explain the following file: ${filePath}
+${FORMAT_RULES}
 
+Keep your response under 250 words. Cover:
+1. **Purpose** — what this file does in one sentence
+2. **Key functions** — what the important functions do (skip trivial ones)
+3. **Data flow** — how data moves through this file
+
+File: ${filePath}
 ${imports}
 ${exports}
 
@@ -66,7 +75,12 @@ export function buildRepoSummaryPrompt(
 
   return `${LEVEL_INSTRUCTIONS[experienceLevel]}
 
-Summarize this repository.
+${FORMAT_RULES}
+
+Keep your response under 200 words. Provide a tight summary covering:
+1. **What it does** — one sentence
+2. **Architecture** — key directories and their roles (3-5 bullets max)
+3. **Tech stack** — frameworks and key dependencies
 
 Repository: ${repoMeta.name}
 Description: ${repoMeta.description || "No description provided."}
@@ -75,9 +89,7 @@ File tree:
 ${fileList}
 
 Module dependency overview:
-${moduleSummary || "No module data available."}
-
-Provide a clear summary of what this codebase does, how it is organized, and the key modules and their responsibilities.`;
+${moduleSummary || "No module data available."}`;
 }
 
 export function buildIssueExplanationPrompt(
@@ -86,13 +98,13 @@ export function buildIssueExplanationPrompt(
 ): string {
   return `${LEVEL_INSTRUCTIONS[experienceLevel]}
 
-Explain the following GitHub issue to a developer so they can understand what needs to be done and where to start.
+${FORMAT_RULES}
+
+Keep your response under 100 words. Explain what this issue is about and where to start.
 
 Title: ${issue.title}
 Labels: ${issue.labels.length ? issue.labels.join(", ") : "none"}
 
 Body:
-${issue.body || "No description provided."}
-
-Provide a concise explanation of what the issue is about, what changes are likely needed, and any relevant context.`;
+${issue.body || "No description provided."}`;
 }

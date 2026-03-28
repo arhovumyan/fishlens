@@ -52,3 +52,83 @@ body {
 .mermaid svg {
   max-width: 100%;
 }
+
+/* ── Markdown prose styling ─────────────────────────────────────────── */
+.prose-glitch h1,
+.prose-glitch h2,
+.prose-glitch h3 {
+  color: #fafafa;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  line-height: 1.3;
+}
+.prose-glitch h1 { font-size: 1.15em; }
+.prose-glitch h2 { font-size: 1.05em; }
+.prose-glitch h3 { font-size: 0.95em; color: #a1a1aa; }
+
+.prose-glitch p {
+  margin: 0.4em 0;
+}
+
+.prose-glitch strong {
+  color: #e4e4e7;
+  font-weight: 600;
+}
+
+.prose-glitch code {
+  background: #27272a;
+  color: #c084fc;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+.prose-glitch pre {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.prose-glitch pre code {
+  background: none;
+  padding: 0;
+  color: #d4d4d8;
+}
+
+.prose-glitch ul,
+.prose-glitch ol {
+  padding-left: 1.25em;
+  margin: 0.4em 0;
+}
+
+.prose-glitch li {
+  margin: 0.15em 0;
+}
+
+.prose-glitch li::marker {
+  color: #3f3f46;
+}
+
+.prose-glitch a {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-glitch hr {
+  border-color: #27272a;
+  margin: 0.75em 0;
+}
+
+/* Collapsible summary */
+.summary-toggle {
+  transition: transform 0.2s ease;
+}
+.summary-toggle.open {
+  transform: rotate(90deg);
+}

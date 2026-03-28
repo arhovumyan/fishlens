@@ -397,7 +397,10 @@ export default function CallGraph({
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-zinc-800 shrink-0">
+          <div
+            className="flex items-center justify-between px-6 py-3 border-b border-zinc-800 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             <span className="text-sm font-semibold text-zinc-300">
               Call Graph — {filePath}
             </span>
@@ -429,7 +432,10 @@ export default function CallGraph({
             </div>
           </div>
 
-          <div className="text-center text-xs text-zinc-600 py-2 border-t border-zinc-800/50">
+          <div
+            className="text-center text-xs text-zinc-600 py-2 border-t border-zinc-800/50"
+            onClick={(e) => e.stopPropagation()}
+          >
             Scroll to zoom · Drag to pan · Click nodes for info · Press Escape to close
           </div>
         </div>
