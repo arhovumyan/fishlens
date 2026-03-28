@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
 
   try {
     const res = await fetch(url, {

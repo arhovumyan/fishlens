@@ -463,26 +463,6 @@ export default function Home() {
                   ))}
                 </div>
               )}
-
-              {/* AI-generated repo banner */}
-              {(bannerImage || bannerLoading) && (
-                <div className="mt-3">
-                  {bannerLoading && !bannerImage ? (
-                    <div className="retro-panel-inset p-4 text-center text-xs text-black/50 animate-pulse">
-                      Generating retro banner...
-                    </div>
-                  ) : bannerImage ? (
-                    <div className="retro-panel-inset p-1">
-                      <img
-                        src={bannerImage}
-                        alt="AI-generated repo banner"
-                        className="w-full h-auto"
-                        style={{ imageRendering: "pixelated" }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              )}
             </div>
           </section>
 
@@ -523,6 +503,30 @@ export default function Home() {
                 </div>
               </div>
             </section>
+
+            {/* AI-generated repo banner */}
+            {(bannerImage || bannerLoading) && (
+              <section className="retro-window">
+                <div className="retro-titlebar retro-titlebar-purple px-3 py-1.5 flex items-center justify-between">
+                  <span className="font-bold">AI Generated Banner</span>
+                  <span className="text-[11px]">{bannerLoading && !bannerImage ? "GENERATING..." : "COMPLETE"}</span>
+                </div>
+                <div className="retro-window-body p-1">
+                  {bannerLoading && !bannerImage ? (
+                    <div className="p-6 text-center text-xs text-black/50 animate-pulse">
+                      Generating retro pixel art banner...
+                    </div>
+                  ) : bannerImage ? (
+                    <img
+                      src={bannerImage}
+                      alt="AI-generated repo banner"
+                      className="w-full h-auto"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  ) : null}
+                </div>
+              </section>
+            )}
           </div>
         </div>
 
