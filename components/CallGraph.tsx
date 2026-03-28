@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import type { DependencyGraph } from "@/lib/dependency-graph";
 
 interface CallGraphEntry {
   imports: string[];
@@ -16,9 +17,109 @@ function sanitizeLabel(s: string): string {
   return s.replace(/["\[\](){}<>#]/g, "");
 }
 
-function buildMermaidDiagram(
+// ── Repo-level diagram ────────────────────────────────────────────────
+function buildRepoDiagram(
+  dependencyGraph: DependencyGraph,
+  callGraph: Record<string, CallGraphEntry>
+): string {
+  const lines: string[] = ["flowchart TB"];
+
+  const internalEdges = dependencyGraph.edges.filter(
+    (e) => e.type === "internal"
+  );
+
+  // Collect files that have at least one internal edge
+  const connectedFiles = new Set<string>();
+  for (const edge of internalEdges) {
+    connectedFiles.add(edge.from);
+    connectedFiles.add(edge.to);
+  }
+
+  // If no connections, show all callGraph files (up to 30)
+  const filesToShow =
+    connectedFiles.size > 0
+      ? connectedFiles
+      : new Set(Object.keys(callGraph).slice(0, 30));
+
+  // Group files by top-level directory
+  const groups = new Map<string, string[]>();
+  for (const file of filesToShow) {
+    const slashIdx = file.indexOf("/");
+    const group = slashIdx !== -1 ? file.slice(0, slashIdx) : "root";
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group)!.push(file);
+  }
+
+  // Render subgraphs
+  for (const [group, files] of groups) {
+    const groupId = sanitizeId(group);
+    lines.push(`  subgraph ${groupId}["${sanitizeLabel(group)}"]`);
+    for (const file of files) {
+      const id = sanitizeId(file);
+      const label = sanitizeLabel(file.split("/").pop() ?? file);
+      lines.push(`    ${id}["${label}"]`);
+
+      // Color by connection count (more = brighter blue)
+      const info = dependencyGraph.fileInfo[file];
+      const connectionCount = info
+        ? info.dependsOn.length + info.dependedOnBy.length
+        : 0;
+      if (connectionCount >= 4) {
+        lines.push(
+          `    style ${id} fill:#2563eb,color:#fff,stroke:#1d4ed8`
+        );
+      } else if (connectionCount >= 2) {
+        lines.push(
+          `    style ${id} fill:#1e40af,color:#e0e7ff,stroke:#1d4ed8`
+        );
+      } else {
+        lines.push(
+          `    style ${id} fill:#1e1e2e,color:#a1a1aa,stroke:#3f3f46`
+        );
+      }
+    }
+    lines.push(`  end`);
+    lines.push(
+      `  style ${groupId} fill:transparent,stroke:#27272a,color:#71717a`
+    );
+  }
+
+  // Render edges
+  const edgeSet = new Set<string>();
+  for (const edge of internalEdges) {
+    const key = `${edge.from}→${edge.to}`;
+    if (edgeSet.has(key)) continue;
+    edgeSet.add(key);
+    const fromId = sanitizeId(edge.from);
+    const toId = sanitizeId(edge.to);
+    const label =
+      edge.symbols.length > 0
+        ? edge.symbols.slice(0, 3).join(", ") +
+          (edge.symbols.length > 3
+            ? ` +${edge.symbols.length - 3}`
+            : "")
+        : "";
+    if (label) {
+      lines.push(`  ${fromId} -->|"${sanitizeLabel(label)}"| ${toId}`);
+    } else {
+      lines.push(`  ${fromId} --> ${toId}`);
+    }
+  }
+
+  // Click callbacks for navigation
+  for (const file of filesToShow) {
+    const id = sanitizeId(file);
+    lines.push(`  click ${id} callback "navigate:${file}"`);
+  }
+
+  return lines.join("\n");
+}
+
+// ── File-level diagram ────────────────────────────────────────────────
+function buildFileDiagram(
   entry: CallGraphEntry,
-  filePath: string
+  filePath: string,
+  hideExternalImports: boolean
 ): string {
   const lines: string[] = ["flowchart LR"];
   const fileName = filePath.split("/").pop() ?? filePath;
@@ -27,12 +128,16 @@ function buildMermaidDiagram(
   lines.push(`  ${fileId}["${sanitizeLabel(fileName)}"]`);
   lines.push(`  style ${fileId} fill:#3b82f6,color:#fff,stroke:#1d4ed8`);
 
-  entry.imports.forEach((imp) => {
-    const impId = sanitizeId(imp);
-    const label = sanitizeLabel(imp.split("/").pop() ?? imp);
-    lines.push(`  ${impId}["${label}"] --> ${fileId}`);
-    lines.push(`  style ${impId} fill:#27272a,color:#a1a1aa,stroke:#3f3f46`);
-  });
+  if (!hideExternalImports) {
+    entry.imports.forEach((imp) => {
+      const impId = sanitizeId(imp);
+      const label = sanitizeLabel(imp.split("/").pop() ?? imp);
+      lines.push(`  ${impId}["${label}"] --> ${fileId}`);
+      lines.push(
+        `  style ${impId} fill:#27272a,color:#a1a1aa,stroke:#3f3f46`
+      );
+    });
+  }
 
   Object.entries(entry.functions).forEach(([fnName, { calls }]) => {
     const fnId = sanitizeId(fnName);
@@ -48,7 +153,7 @@ function buildMermaidDiagram(
     });
   });
 
-  // Add click callbacks — Mermaid supports click nodeId callback
+  // Click callbacks
   lines.push(`  click ${fileId} callback "file:${sanitizeLabel(fileName)}"`);
   entry.imports.forEach((imp) => {
     const impId = sanitizeId(imp);
@@ -56,7 +161,9 @@ function buildMermaidDiagram(
   });
   Object.entries(entry.functions).forEach(([fnName, { calls }]) => {
     const fnId = sanitizeId(fnName);
-    lines.push(`  click ${fnId} callback "function:${sanitizeLabel(fnName)}"`);
+    lines.push(
+      `  click ${fnId} callback "function:${sanitizeLabel(fnName)}"`
+    );
     calls.forEach((call) => {
       const callId = sanitizeId(call) + "_call";
       lines.push(`  click ${callId} callback "call:${sanitizeLabel(call)}"`);
@@ -80,7 +187,6 @@ function useZoomPan() {
   }, []);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only start drag on middle click or when not clicking a node
     if (e.button === 1 || !(e.target as HTMLElement).closest(".node")) {
       dragging.current = true;
       lastPos.current = { x: e.clientX, y: e.clientY };
@@ -105,8 +211,14 @@ function useZoomPan() {
     setTranslate({ x: 0, y: 0 });
   }, []);
 
-  const zoomIn = useCallback(() => setScale((s) => Math.min(s + 0.25, 4)), []);
-  const zoomOut = useCallback(() => setScale((s) => Math.max(s - 0.25, 0.3)), []);
+  const zoomIn = useCallback(
+    () => setScale((s) => Math.min(s + 0.25, 4)),
+    []
+  );
+  const zoomOut = useCallback(
+    () => setScale((s) => Math.max(s - 0.25, 0.3)),
+    []
+  );
 
   const style: React.CSSProperties = {
     transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
@@ -117,7 +229,13 @@ function useZoomPan() {
   return {
     scale,
     style,
-    handlers: { onWheel, onMouseDown, onMouseMove, onMouseUp, onMouseLeave: onMouseUp },
+    handlers: {
+      onWheel,
+      onMouseDown,
+      onMouseMove,
+      onMouseUp,
+      onMouseLeave: onMouseUp,
+    },
     zoomIn,
     zoomOut,
     reset,
@@ -132,12 +250,19 @@ interface NodeInfo {
   y: number;
 }
 
+// ── Main Component ────────────────────────────────────────────────────
 export default function CallGraph({
   entry,
   filePath,
+  dependencyGraph,
+  callGraph,
+  onFileNavigate,
 }: {
   entry: CallGraphEntry | null;
   filePath: string | null;
+  dependencyGraph?: DependencyGraph;
+  callGraph?: Record<string, CallGraphEntry>;
+  onFileNavigate?: (filePath: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fullscreenSvgRef = useRef<HTMLDivElement>(null);
@@ -145,9 +270,18 @@ export default function CallGraph({
   const [svgContent, setSvgContent] = useState<string>("");
   const [fullscreen, setFullscreen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
+  const [viewMode, setViewMode] = useState<"repo" | "file">("repo");
+  const [hideExternalImports, setHideExternalImports] = useState(false);
 
   const inlineZoom = useZoomPan();
   const fullscreenZoom = useZoomPan();
+
+  // Switch to file view when a file is selected
+  useEffect(() => {
+    if (filePath && entry) {
+      setViewMode("file");
+    }
+  }, [filePath, entry]);
 
   // Close on Escape
   useEffect(() => {
@@ -165,8 +299,6 @@ export default function CallGraph({
   // Set up click handlers on Mermaid nodes
   const attachClickHandlers = useCallback(
     (container: HTMLElement) => {
-      // Mermaid renders click callbacks by adding click events
-      // We intercept clicks on .node elements directly
       const nodes = container.querySelectorAll(".node");
       nodes.forEach((node) => {
         const el = node as HTMLElement;
@@ -174,14 +306,36 @@ export default function CallGraph({
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           const rect = el.getBoundingClientRect();
-          const label = el.querySelector(".nodeLabel")?.textContent ?? el.id;
+          const label =
+            el.querySelector(".nodeLabel")?.textContent ?? el.id;
+
+          // Check if this is a navigation click (repo view → file)
+          const nodeId = el.id;
+          if (viewMode === "repo" && onFileNavigate) {
+            // Find the file path from the node ID
+            const allFiles = callGraph ? Object.keys(callGraph) : [];
+            const matched = allFiles.find(
+              (f) => sanitizeId(f) === nodeId.replace(/^flowchart-/, "").replace(/-\d+$/, "")
+            );
+            if (matched) {
+              onFileNavigate(matched);
+              return;
+            }
+          }
+
           // Determine node type from styling
-          const fill = el.querySelector("rect, polygon, .label-container")?.getAttribute("style") ?? "";
+          const fill =
+            el
+              .querySelector("rect, polygon, .label-container")
+              ?.getAttribute("style") ?? "";
           let type = "node";
-          if (fill.includes("#3b82f6")) type = "Current File";
+          if (fill.includes("#3b82f6") || fill.includes("#2563eb") || fill.includes("#1e40af"))
+            type = viewMode === "repo" ? "File" : "Current File";
           else if (fill.includes("#27272a")) type = "Import";
-          else if (fill.includes("#c084fc") || fill.includes("#7c3aed")) type = "Function";
-          else if (fill.includes("#fbbf24") || fill.includes("#a16207")) type = "Called Function";
+          else if (fill.includes("#c084fc") || fill.includes("#7c3aed"))
+            type = "Function";
+          else if (fill.includes("#fbbf24") || fill.includes("#a16207"))
+            type = "Called Function";
 
           setSelectedNode({
             type,
@@ -192,27 +346,54 @@ export default function CallGraph({
         });
       });
     },
-    []
+    [viewMode, callGraph, onFileNavigate]
   );
 
   // Render diagram
   useEffect(() => {
-    if (!entry || !filePath) return;
+    let diagram: string | null = null;
 
-    const isEmpty =
-      entry.imports.length === 0 &&
-      entry.exports.length === 0 &&
-      Object.keys(entry.functions).length === 0;
+    if (viewMode === "repo" && dependencyGraph && callGraph) {
+      const hasEdges = dependencyGraph.edges.some(
+        (e) => e.type === "internal"
+      );
+      if (!hasEdges && Object.keys(callGraph).length === 0) {
+        setError("No dependency data available");
+        setSvgContent("");
+        return;
+      }
+      diagram = buildRepoDiagram(dependencyGraph, callGraph);
+    } else if (viewMode === "file" && entry && filePath) {
+      const isEmpty =
+        entry.imports.length === 0 &&
+        entry.exports.length === 0 &&
+        Object.keys(entry.functions).length === 0;
 
-    if (isEmpty) {
-      setError("No call graph available for this file");
+      if (isEmpty) {
+        const isJsTsFile = /\.(ts|tsx|js|jsx)$/.test(filePath);
+        setError(
+          isJsTsFile
+            ? "No call graph data for this file"
+            : "Structural analysis is available for JavaScript and TypeScript files"
+        );
+        setSvgContent("");
+        return;
+      }
+      diagram = buildFileDiagram(entry, filePath, hideExternalImports);
+    } else if (viewMode === "repo") {
+      setError(null);
+      setSvgContent("");
+      return;
+    } else {
+      setError(null);
       setSvgContent("");
       return;
     }
 
+    if (!diagram) return;
+
     setError(null);
     setSelectedNode(null);
-    const diagram = buildMermaidDiagram(entry, filePath);
 
     let cancelled = false;
 
@@ -246,7 +427,7 @@ export default function CallGraph({
       } catch (err) {
         console.error("[CallGraph] Mermaid render error:", err);
         if (!cancelled) {
-          setError("Failed to render call graph");
+          setError("Failed to render graph");
           setSvgContent("");
         }
       }
@@ -255,7 +436,15 @@ export default function CallGraph({
     return () => {
       cancelled = true;
     };
-  }, [entry, filePath, attachClickHandlers]);
+  }, [
+    viewMode,
+    entry,
+    filePath,
+    dependencyGraph,
+    callGraph,
+    hideExternalImports,
+    attachClickHandlers,
+  ]);
 
   // Sync fullscreen container
   useEffect(() => {
@@ -264,7 +453,7 @@ export default function CallGraph({
       attachClickHandlers(fullscreenSvgRef.current);
       fullscreenZoom.reset();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen, svgContent, attachClickHandlers]);
 
   const openFullscreen = useCallback(() => {
@@ -274,27 +463,17 @@ export default function CallGraph({
     }
   }, [svgContent]);
 
-  if (!filePath) {
-    return (
-      <div className="h-full flex items-center justify-center text-zinc-600 text-sm">
-        Select a file to view its call graph
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center text-zinc-600 text-sm px-4 text-center">
-        {error}
-      </div>
-    );
-  }
-
+  // ── Zoom controls sub-component ──────────────────────────────────────
   const ZoomControls = ({
     zoom,
     className,
   }: {
-    zoom: { scale: number; zoomIn: () => void; zoomOut: () => void; reset: () => void };
+    zoom: {
+      scale: number;
+      zoomIn: () => void;
+      zoomOut: () => void;
+      reset: () => void;
+    };
     className?: string;
   }) => (
     <div className={`flex items-center gap-1 ${className ?? ""}`}>
@@ -322,13 +501,86 @@ export default function CallGraph({
     </div>
   );
 
+  // ── No content states ─────────────────────────────────────────────────
+  if (!filePath && viewMode === "file") {
+    return (
+      <div className="h-full flex items-center justify-center text-zinc-600 text-sm">
+        Select a file to view its call graph
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            {viewMode === "file" && (
+              <button
+                onClick={() => {
+                  setViewMode("repo");
+                  inlineZoom.reset();
+                }}
+                className="text-blue-400 hover:text-blue-300 transition-colors text-[10px]"
+              >
+                Repo
+              </button>
+            )}
+            {viewMode === "file" && (
+              <span className="text-zinc-700">/</span>
+            )}
+            <span>
+              {viewMode === "repo" ? "Dependencies" : "Call Graph"}
+            </span>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm px-4 text-center">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Header */}
+        {/* Header with breadcrumb, filters, zoom, fullscreen */}
         <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800 flex items-center justify-between shrink-0">
-          <span>Call Graph</span>
           <div className="flex items-center gap-2">
+            {/* Breadcrumb */}
+            {viewMode === "file" && (
+              <button
+                onClick={() => {
+                  setViewMode("repo");
+                  inlineZoom.reset();
+                }}
+                className="text-blue-400 hover:text-blue-300 transition-colors text-[10px]"
+              >
+                Repo
+              </button>
+            )}
+            {viewMode === "file" && (
+              <span className="text-zinc-700">/</span>
+            )}
+            <span>
+              {viewMode === "repo" ? "Dependencies" : "Call Graph"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Filter toggle — file view only */}
+            {viewMode === "file" && entry && entry.imports.length > 0 && (
+              <button
+                onClick={() => setHideExternalImports((h) => !h)}
+                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                  hideExternalImports
+                    ? "bg-zinc-700 text-zinc-300"
+                    : "bg-zinc-800/50 text-zinc-500 hover:text-zinc-300"
+                }`}
+                title="Toggle external imports"
+              >
+                Imports {hideExternalImports ? "off" : "on"}
+              </button>
+            )}
             {svgContent && <ZoomControls zoom={inlineZoom} />}
             {svgContent && (
               <button
@@ -336,7 +588,16 @@ export default function CallGraph({
                 className="text-zinc-500 hover:text-zinc-200 transition-colors ml-1"
                 title="View fullscreen"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="15 3 21 3 21 9" />
                   <polyline points="9 21 3 21 3 15" />
                   <line x1="21" y1="3" x2="14" y2="10" />
@@ -357,7 +618,6 @@ export default function CallGraph({
               ref={containerRef}
               className="p-4"
               onClick={(e) => {
-                // Open fullscreen on double-click
                 if (e.detail === 2) openFullscreen();
               }}
             />
@@ -367,7 +627,9 @@ export default function CallGraph({
         {/* Hint */}
         {svgContent && (
           <div className="text-center text-[10px] text-zinc-600 py-1 border-t border-zinc-800/50 shrink-0">
-            Scroll to zoom · Drag to pan · Click node for info · Double-click to expand
+            {viewMode === "repo"
+              ? "Click file to drill in · Scroll to zoom · Drag to pan"
+              : "Scroll to zoom · Drag to pan · Click node for info · Double-click to expand"}
           </div>
         )}
       </div>
@@ -383,7 +645,9 @@ export default function CallGraph({
           }}
         >
           <div className="text-zinc-400">{selectedNode.type}</div>
-          <div className="text-zinc-100 font-mono font-medium">{selectedNode.name}</div>
+          <div className="text-zinc-100 font-mono font-medium">
+            {selectedNode.name}
+          </div>
         </div>
       )}
 
@@ -401,9 +665,28 @@ export default function CallGraph({
             className="flex items-center justify-between px-6 py-3 border-b border-zinc-800 shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="text-sm font-semibold text-zinc-300">
-              Call Graph — {filePath}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-zinc-300">
+                {viewMode === "repo"
+                  ? "Repository Dependencies"
+                  : `Call Graph — ${filePath}`}
+              </span>
+              {/* Filter toggle in fullscreen */}
+              {viewMode === "file" &&
+                entry &&
+                entry.imports.length > 0 && (
+                  <button
+                    onClick={() => setHideExternalImports((h) => !h)}
+                    className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                      hideExternalImports
+                        ? "bg-zinc-700 text-zinc-300"
+                        : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    Imports {hideExternalImports ? "off" : "on"}
+                  </button>
+                )}
+            </div>
             <div className="flex items-center gap-3">
               <ZoomControls zoom={fullscreenZoom} />
               <button
@@ -436,7 +719,8 @@ export default function CallGraph({
             className="text-center text-xs text-zinc-600 py-2 border-t border-zinc-800/50"
             onClick={(e) => e.stopPropagation()}
           >
-            Scroll to zoom · Drag to pan · Click nodes for info · Press Escape to close
+            Scroll to zoom · Drag to pan · Click nodes for info · Press
+            Escape to close
           </div>
         </div>
       )}

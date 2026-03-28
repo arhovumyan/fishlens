@@ -4,7 +4,7 @@ interface CacheEntry {
 }
 
 const TTL = 15 * 60 * 1000; // 15 minutes
-const MAX_ENTRIES = 10;
+const MAX_ENTRIES = 50;
 const cache = new Map<string, CacheEntry>();
 
 export function getCache(key: string): unknown | null {

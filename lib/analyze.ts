@@ -1,6 +1,7 @@
 import { parseGitHubUrl, fetchRepoData } from "@/lib/github";
 import { parseCodebase } from "@/lib/parser";
 import { getCache, setCache } from "@/lib/cache";
+import { buildDependencyGraph, type DependencyGraph } from "@/lib/dependency-graph";
 
 export interface AnalysisResult {
   repoMeta: { name: string; description: string; language: string; stars: number };
@@ -14,6 +15,7 @@ export interface AnalysisResult {
     }
   >;
   rawFiles: Record<string, string>;
+  dependencyGraph: DependencyGraph;
 }
 
 /**
@@ -35,7 +37,16 @@ export async function getAnalysis(repoUrl: string): Promise<AnalysisResult> {
   const t2 = performance.now();
   console.log(`[analyze] parseCodebase: ${Math.round(t2 - t1)}ms`);
 
-  const result: AnalysisResult = { repoMeta, fileTree, callGraph, rawFiles };
+  const allFilePaths = fileTree
+    .filter((f) => f.type === "file")
+    .map((f) => f.path);
+  const dependencyGraph = buildDependencyGraph(callGraph, allFilePaths);
+  const t3 = performance.now();
+  console.log(
+    `[analyze] buildDependencyGraph: ${Math.round(t3 - t2)}ms — ${dependencyGraph.edges.length} edges`
+  );
+
+  const result: AnalysisResult = { repoMeta, fileTree, callGraph, rawFiles, dependencyGraph };
   setCache(repoUrl, result);
   return result;
 }

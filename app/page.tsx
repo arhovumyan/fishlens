@@ -36,12 +36,13 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
 
-  // Data from /api/parse (fetched indirectly through /api/summary)
+  // Data from /api/parse
   const [repoMeta, setRepoMeta] = useState<RepoMeta | null>(null);
   const [fileTree, setFileTree] = useState<FileTreeEntry[]>([]);
   const [callGraph, setCallGraph] = useState<
     Record<string, CallGraphEntry>
   >({});
+  const [dependencyGraph, setDependencyGraph] = useState<import("@/lib/dependency-graph").DependencyGraph | undefined>(undefined);
 
   // Summary streaming
   const [summary, setSummary] = useState("");
@@ -180,6 +181,7 @@ export default function Home() {
       setRepoMeta(parsed.repoMeta);
       setFileTree(parsed.fileTree);
       setCallGraph(parsed.callGraph);
+      setDependencyGraph(parsed.dependencyGraph);
       setAnalyzed(true);
 
       // Then start streaming summary
@@ -194,14 +196,10 @@ export default function Home() {
     }
   };
 
-  // File selection handler — only fetch explanation for code files that were parsed
+  // File selection handler — fetch explanation for any file
   const handleFileSelect = (filePath: string) => {
     setSelectedFile(filePath);
-    if (callGraph[filePath]) {
-      fetchExplanation(currentRepoUrl.current, filePath, experienceLevel);
-    } else {
-      setExplanation("This file type was not parsed. Only .ts, .tsx, .js, and .jsx files are analyzed.");
-    }
+    fetchExplanation(currentRepoUrl.current, filePath, experienceLevel);
   };
 
   // Re-fetch on experience level change
@@ -218,7 +216,7 @@ export default function Home() {
     if (!analyzed) return;
 
     fetchSummary(currentRepoUrl.current, experienceLevel);
-    if (selectedFile && callGraph[selectedFile]) {
+    if (selectedFile) {
       fetchExplanation(
         currentRepoUrl.current,
         selectedFile,
@@ -346,6 +344,9 @@ export default function Home() {
               <CallGraph
                 entry={selectedFile ? callGraph[selectedFile] ?? null : null}
                 filePath={selectedFile}
+                dependencyGraph={dependencyGraph}
+                callGraph={callGraph}
+                onFileNavigate={handleFileSelect}
               />
             </div>
           </div>

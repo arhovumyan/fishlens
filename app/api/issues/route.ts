@@ -3,6 +3,7 @@ import { Octokit } from "@octokit/rest";
 import { parseGitHubUrl } from "@/lib/github";
 import { buildIssueExplanationPrompt } from "@/lib/prompts";
 import { generateExplanation } from "@/lib/gemini";
+import { getAICache, setAICache, aiCacheKey } from "@/lib/ai-cache";
 
 type Difficulty = "easy" | "medium" | "hard";
 const DIFFICULTY_ORDER: Record<Difficulty, number> = {
@@ -98,16 +99,23 @@ export async function GET(req: NextRequest) {
     (a, b) => DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty]
   );
 
-  // Generate AI explanations — cap at MAX_GEMINI_CALLS
+  // Generate AI explanations — cap at MAX_GEMINI_CALLS, use cache
   const issues = await Promise.all(
     mapped.map(async (issue, idx) => {
       let explanation = "";
       if (idx < MAX_GEMINI_CALLS) {
-        const prompt = buildIssueExplanationPrompt(
-          { title: issue.title, body: issue.body, labels: issue.labels },
-          experienceLevel as "junior" | "mid" | "senior"
-        );
-        explanation = await generateExplanation(prompt);
+        const cacheKey = aiCacheKey("issue", String(issue.id), experienceLevel);
+        const cached = getAICache(cacheKey);
+        if (cached) {
+          explanation = cached;
+        } else {
+          const prompt = buildIssueExplanationPrompt(
+            { title: issue.title, body: issue.body, labels: issue.labels },
+            experienceLevel as "junior" | "mid" | "senior"
+          );
+          explanation = await generateExplanation(prompt);
+          setAICache(cacheKey, explanation);
+        }
       }
       return {
         id: issue.id,
