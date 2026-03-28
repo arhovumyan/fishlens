@@ -1,4 +1,4 @@
-import { Parser, Language, type SyntaxNode } from "web-tree-sitter";
+import { Parser, Language, type Node as SyntaxNode } from "web-tree-sitter";
 import path from "path";
 
 let tsLang: Language;
